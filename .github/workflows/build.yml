@@ -24,6 +24,10 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: clear corrupted cargo cache
+        run: cargo clean
+        working-directory: app/src-tauri
+
       - name: install app dependencies
         run: npm install
         working-directory: app

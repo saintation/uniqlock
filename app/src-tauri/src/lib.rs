@@ -13,7 +13,7 @@ pub fn run() {
             tauri::tray::TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("UniQlock Smart Idle Widget")
-                .on_tray_icon_event(|tray, event| {
+                .on_tray_icon_event(|_tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
                         button_state: tauri::tray::MouseButtonState::Up,
