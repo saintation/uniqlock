@@ -1,4 +1,4 @@
-use tauri::{Manager, Emitter};
+use tauri::Emitter;
 use std::time::Duration;
 use user_idle::UserIdle;
 
@@ -34,7 +34,7 @@ pub fn run() {
                 loop {
                     std::thread::sleep(Duration::from_millis(1000));
                     if let Ok(idle_time) = UserIdle::get_time() {
-                        let is_idle_now = idle_time.as_secs() >= threshold_secs;
+                        let is_idle_now = idle_time.as_seconds() >= threshold_secs;
                         if is_idle_now && !was_idle {
                             was_idle = true;
                             let _ = app_handle.emit("idle-state-changed", true);
