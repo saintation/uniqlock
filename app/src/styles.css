@@ -28,12 +28,25 @@ body {
   width: 100%;
   height: 100%;
   opacity: 1;
-  transition: opacity var(--transition-speed) ease-in-out;
+  transition: opacity var(--transition-speed) ease-in-out, background-color var(--transition-speed) ease-in-out;
 }
 
 #widget-container.hidden {
   opacity: 0;
   pointer-events: none;
+}
+
+#widget-container.day-bg {
+  background-color: #ffffff;
+  color: #000000;
+}
+#widget-container.day-bg #clock-display {
+  text-shadow: none; /* Dark text on white bg usually doesn't need dark shadow */
+}
+
+#widget-container.night-bg {
+  background-color: #000000;
+  color: #ffffff;
 }
 
 /* Background Video */
@@ -45,6 +58,11 @@ body {
   height: 100%;
   object-fit: cover;
   z-index: 0;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+#bg-video.hidden {
+  opacity: 0;
 }
 
 /* Overlay & Drag Region */
@@ -69,6 +87,7 @@ body {
   letter-spacing: 0.1em;
   text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.7);
   pointer-events: none; /* Let drag events pass through to the overlay */
+  transition: color var(--transition-speed) ease-in-out;
 }
 
 /* Controls */
