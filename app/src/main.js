@@ -171,18 +171,23 @@ function updateClock() {
     lastTickSecond = s;
     
     // Animate every second
-    if (clockTickCount === 0) {
-      viewContainer.className = "overlay top-to-bottom";
-    } else if (clockTickCount === 1) {
-      viewContainer.className = "overlay right-to-left";
-    } else if (clockTickCount === 2) {
-      viewContainer.className = "overlay bottom-to-top";
-    } else if (clockTickCount === 3) {
-      viewContainer.className = "overlay left-to-right";
+    let currentClasses = "overlay";
+    if (isPlayingVideo) {
+      currentClasses += " hidden";
+    } else {
+      if (clockTickCount === 0) {
+        currentClasses += " top-to-bottom";
+      } else if (clockTickCount === 1) {
+        currentClasses += " right-to-left";
+      } else if (clockTickCount === 2) {
+        currentClasses += " bottom-to-top";
+      } else if (clockTickCount === 3) {
+        currentClasses += " left-to-right";
+      }
+      clockTickCount = (clockTickCount + 1) % 4;
+      toggleColors();
     }
-    
-    clockTickCount = (clockTickCount + 1) % 4;
-    toggleColors();
+    viewContainer.className = currentClasses;
   }
   
   const hStr = String(h).padStart(2, '0');
