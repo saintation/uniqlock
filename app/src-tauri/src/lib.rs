@@ -3,11 +3,88 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use std::time::Duration;
 use user_idle::UserIdle;
+use std::io::Write;
+use zip::ZipArchive;
+
+#[tauri::command]
+fn check_assets_exist(app: tauri::AppHandle) -> bool {
+    if let Ok(dir) = app.path().app_data_dir() {
+        let assets_dir = dir.join("external_assets");
+        return assets_dir.exists();
+    }
+    false
+}
+
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
+async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String> {
+    let url = "https://github.com/saintation/uniqlock/archive/0b6d31c3ac8baaeb800df17418cd0c37909a9698.zip";
+    
+    let _ = app.emit("download-progress", "Downloading media archive (1.3GB)... This may take a few minutes.");
+    
+    let mut response = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    
+    let temp_dir = std::env::temp_dir();
+    let zip_path = temp_dir.join("uniqlock_assets.zip");
+    let mut file = std::fs::File::create(&zip_path).map_err(|e| e.to_string())?;
+    
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+    }
+    
+    let _ = app.emit("download-progress", "Extracting media files...");
+    
+    let file = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
+    let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+    
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let target_dir = app_data_dir.join("external_assets");
+    
+    std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+        
+        let components: Vec<_> = outpath.components().collect();
+        // Archive format: uniqlock-<hash>/reference/assets/...
+        if components.len() > 3 && components[1].as_os_str() == "reference" && components[2].as_os_str() == "assets" {
+            let mut new_path = target_dir.clone();
+            for comp in components.into_iter().skip(3) {
+                new_path.push(comp);
+            }
+            
+            if (*file.name()).ends_with('/') {
+                std::fs::create_dir_all(&new_path).map_err(|e| e.to_string())?;
+            } else {
+                if let Some(p) = new_path.parent() {
+                    if !p.exists() {
+                        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                    }
+                }
+                let mut outfile = std::fs::File::create(&new_path).map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    
+    let _ = std::fs::remove_file(zip_path);
+    let _ = app.emit("download-progress", "Done");
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![check_assets_exist, download_and_extract_assets, exit_app])
         .setup(|app| {
             let app_handle = app.handle().clone();
             
@@ -32,7 +109,6 @@ pub fn run() {
                     } = event {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            // Toggle for manual testing if needed
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
@@ -46,7 +122,6 @@ pub fn run() {
             // Start the OS-level global idle monitoring thread
             std::thread::spawn(move || {
                 let mut was_idle = false;
-                // For testing, we use 5 seconds.
                 let threshold_secs = 5;
 
                 loop {
@@ -56,7 +131,6 @@ pub fn run() {
                         if is_idle_now && !was_idle {
                             was_idle = true;
                             if let Some(window) = app_handle.get_webview_window("main") {
-                                // Move to bottom right
                                 if let Ok(Some(monitor)) = window.current_monitor() {
                                     let size = window.outer_size().unwrap_or_default();
                                     let monitor_size = monitor.size();

@@ -5,6 +5,10 @@ const clockDisplay = document.getElementById('clock-display');
 const muteBtn = document.getElementById('mute-btn');
 const iconMuted = document.getElementById('icon-muted');
 const iconUnmuted = document.getElementById('icon-unmuted');
+const downloadPrompt = document.getElementById('download-prompt');
+const downloadStatus = document.getElementById('download-status');
+const btnYes = document.getElementById('btn-download-yes');
+const btnNo = document.getElementById('btn-download-no');
 
 let isIdle = false;
 let isPlayingVideo = false;
@@ -12,37 +16,42 @@ let lastTriggeredSecond = -1;
 let lastPlayedVideo = "";
 let fadeInterval = null;
 
-const { resolveResource } = window.__TAURI__.path;
-const { convertFileSrc } = window.__TAURI__.core;
+const { appDataDir, join } = window.__TAURI__.path;
+const { convertFileSrc, invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 // Grouped by Day (06:00 - 20:59) and Night (21:00 - 05:59)
 const mediaAssets = {
   day: {
     videos: [
-      "external_assets/videos/Season 2/Season 2 - Day - 21.webm",
-      "external_assets/videos/Season 4/Season 4 - Day - 22.webm"
+      "videos/Season 2/Season 2 - Day - 21.webm",
+      "videos/Season 4/Season 4 - Day - 22.webm"
     ],
     audio: [
-      "external_assets/music/00 - Season 1.ogg",
-      "external_assets/music/01 - Season 1.ogg",
-      "external_assets/music/04 - Season 2.ogg",
-      "external_assets/music/05 - Season 3.ogg",
-      "external_assets/music/09 - Season 5.ogg"
+      "music/00 - Season 1.ogg",
+      "music/01 - Season 1.ogg",
+      "music/04 - Season 2.ogg",
+      "music/05 - Season 3.ogg",
+      "music/09 - Season 5.ogg"
     ]
   },
   night: {
     videos: [
-      "external_assets/videos/Season 4/Season 4 - Night - 32.webm",
-      "external_assets/videos/Season 2/Season 2 - Night - 15.webm",
-      "external_assets/videos/Season 4/Season 4 - Night - 05.webm"
+      "videos/Season 4/Season 4 - Night - 32.webm",
+      "videos/Season 2/Season 2 - Night - 15.webm",
+      "videos/Season 4/Season 4 - Night - 05.webm"
     ],
     audio: [
-      "external_assets/music/Night - 01 - Season 2.ogg",
-      "external_assets/music/Night - 02 - Season 4.ogg"
+      "music/Night - 01 - Season 2.ogg",
+      "music/Night - 02 - Season 4.ogg"
     ]
   }
 };
+
+async function getLocalAssetPath(relativePath) {
+  const dataDir = await appDataDir();
+  return await join(dataDir, "external_assets", relativePath);
+}
 
 function getTimeOfDay(hour) {
   if (hour >= 6 && hour < 21) {
@@ -102,7 +111,7 @@ async function triggerVideo(timeOfDay) {
   lastPlayedVideo = randomVideo;
   
   try {
-    const resourcePath = await resolveResource(randomVideo);
+    const resourcePath = await getLocalAssetPath(randomVideo);
     bgVideo.src = convertFileSrc(resourcePath);
     
     bgVideo.classList.remove('hidden');
@@ -130,7 +139,7 @@ async function ensureAudioPlaying(timeOfDay) {
   if (bgAudio.paused && isIdle) {
     const randomAudio = getRandomItem(mediaAssets[timeOfDay].audio);
     try {
-      const resourcePath = await resolveResource(randomAudio);
+      const resourcePath = await getLocalAssetPath(randomAudio);
       bgAudio.src = convertFileSrc(resourcePath);
       fadeInAudio();
     } catch (error) {
@@ -180,7 +189,7 @@ updateClock();
 
 // Mute Button Logic
 muteBtn.addEventListener('click', () => {
-  isMuted = !bgAudio.muted;
+  let isMuted = !bgAudio.muted;
   bgAudio.muted = isMuted;
   
   if (isMuted) {
@@ -212,3 +221,45 @@ listen('idle-state-changed', (event) => {
     lastTriggeredSecond = -1;
   }
 });
+
+// Initialization and Download Logic
+async function initApp() {
+  const hasAssets = await invoke("check_assets_exist");
+  if (!hasAssets) {
+    // Show download prompt
+    downloadPrompt.classList.remove('hidden');
+  } else {
+    // Assets ready
+    console.log("Assets are ready locally.");
+  }
+}
+
+btnNo.addEventListener('click', async () => {
+  await invoke("exit_app");
+});
+
+btnYes.addEventListener('click', async () => {
+  btnYes.disabled = true;
+  btnNo.disabled = true;
+  downloadStatus.textContent = "Connecting to GitHub...";
+  
+  const unlisten = await listen('download-progress', (e) => {
+    downloadStatus.textContent = e.payload;
+  });
+
+  try {
+    await invoke("download_and_extract_assets");
+    downloadStatus.textContent = "Download complete!";
+    setTimeout(() => {
+      downloadPrompt.classList.add('hidden');
+      unlisten();
+    }, 1500);
+  } catch (error) {
+    downloadStatus.textContent = "Error: " + error;
+    downloadStatus.style.color = "#f44336";
+    btnYes.disabled = false;
+    btnNo.disabled = false;
+  }
+});
+
+initApp();
