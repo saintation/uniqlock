@@ -113,9 +113,15 @@ async function triggerVideo(timeOfDay) {
     bgVideo.classList.remove('hidden');
     isPlayingVideo = true;
     
-    bgVideo.play().catch(e => console.error("Video play error:", e));
+    bgVideo.play().catch(e => {
+      console.error("Video play error:", e);
+      isPlayingVideo = false;
+      bgVideo.classList.add('hidden');
+    });
   } catch (error) {
     console.error("Failed to load video resource:", error);
+    isPlayingVideo = false;
+    bgVideo.classList.add('hidden');
   }
 }
 
@@ -241,20 +247,19 @@ listen('idle-state-changed', (event) => {
   }
 });
 
-// Initialization and Download Logic
-async function initApp() {
-  const hasAssets = await invoke("check_assets_exist");
-  if (!hasAssets) {
-    // Show download prompt
-    downloadPrompt.classList.remove('hidden');
-  } else {
-    // Assets ready
-    console.log("Assets are ready locally.");
+function hideWindowIfNotIdle() {
+  if (!isIdle) {
+    invoke("hide_window");
   }
 }
 
+listen('start-download', () => {
+  downloadPrompt.classList.remove('hidden');
+});
+
 btnNo.addEventListener('click', async () => {
-  await invoke("exit_app");
+  downloadPrompt.classList.add('hidden');
+  hideWindowIfNotIdle();
 });
 
 btnYes.addEventListener('click', async () => {
@@ -272,6 +277,7 @@ btnYes.addEventListener('click', async () => {
     setTimeout(() => {
       downloadPrompt.classList.add('hidden');
       unlisten();
+      hideWindowIfNotIdle();
     }, 1500);
   } catch (error) {
     downloadStatus.textContent = "Error: " + error;
@@ -280,5 +286,3 @@ btnYes.addEventListener('click', async () => {
     btnNo.disabled = false;
   }
 });
-
-initApp();

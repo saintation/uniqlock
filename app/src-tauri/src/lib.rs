@@ -25,6 +25,13 @@ fn get_asset_path(app: tauri::AppHandle, filename: String) -> String {
 }
 
 #[tauri::command]
+fn hide_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+#[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -93,21 +100,9 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, download_and_extract_assets, exit_app])
+        .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, hide_window, download_and_extract_assets, exit_app])
         .setup(|app| {
             let app_handle = app.handle().clone();
-            
-            // Immediately show window if assets are missing
-            let assets_exist = if let Ok(dir) = app_handle.path().app_data_dir() {
-                dir.join("external_assets").exists()
-            } else {
-                false
-            };
-            if !assets_exist {
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.show();
-                }
-            }
             
             let vol_100 = MenuItem::with_id(app, "vol_100", "Volume: 100%", true, None::<&str>)?;
             let vol_75 = MenuItem::with_id(app, "vol_75", "Volume: 75%", true, None::<&str>)?;
@@ -116,8 +111,9 @@ pub fn run() {
             let vol_0 = MenuItem::with_id(app, "vol_0", "Mute", true, None::<&str>)?;
             let vol_submenu = Submenu::with_items(app, "Volume", true, &[&vol_100, &vol_75, &vol_50, &vol_25, &vol_0])?;
             
+            let download_i = MenuItem::with_id(app, "download", "Download Media Assets", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&vol_submenu, &quit_i])?;
+            let menu = Menu::with_items(app, &[&vol_submenu, &download_i, &quit_i])?;
 
             // System Tray setup
             TrayIconBuilder::new()
@@ -127,6 +123,20 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     if event.id.as_ref() == "quit" {
                         app.exit(0);
+                    } else if event.id.as_ref() == "download" {
+                        if let Some(window) = app.get_webview_window("main") {
+                            // Position it if needed, or just show
+                            if let Ok(Some(monitor)) = window.current_monitor() {
+                                let size = window.outer_size().unwrap_or_default();
+                                let monitor_size = monitor.size();
+                                let x = monitor_size.width.saturating_sub(size.width + 20) as i32;
+                                let y = monitor_size.height.saturating_sub(size.height + 40) as i32;
+                                let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                            }
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = app.emit("start-download", ());
+                        }
                     } else if event.id.as_ref().starts_with("vol_") {
                         let vol_str = event.id.as_ref().replace("vol_", "");
                         let vol: f32 = vol_str.parse().unwrap_or(100.0) / 100.0;
