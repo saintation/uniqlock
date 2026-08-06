@@ -1,24 +1,22 @@
 const widgetContainer = document.getElementById('widget-container');
 const bgVideo = document.getElementById('bg-video');
 const bgAudio = document.getElementById('bg-audio');
-const clockDisplay = document.getElementById('clock-display');
-const muteBtn = document.getElementById('mute-btn');
-const iconMuted = document.getElementById('icon-muted');
-const iconUnmuted = document.getElementById('icon-unmuted');
-const downloadPrompt = document.getElementById('download-prompt');
-const downloadStatus = document.getElementById('download-status');
-const btnYes = document.getElementById('btn-download-yes');
-const btnNo = document.getElementById('btn-download-no');
+const viewContainer = document.getElementById('viewContainer');
+const time1El = document.querySelector('#time1 .time');
+const time2El = document.querySelector('#time2 .time');
 
 let isIdle = false;
 let isPlayingVideo = false;
 let lastTriggeredSecond = -1;
 let lastPlayedVideo = "";
 let fadeInterval = null;
+let clockTickCount = 0;
+let lastTickSecond = -1;
 
 const { appDataDir, join } = window.__TAURI__.path;
 const { convertFileSrc, invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
+const { getCurrentWindow } = window.__TAURI__.window;
 
 // Grouped by Day (06:00 - 20:59) and Night (21:00 - 05:59)
 const mediaAssets = {
@@ -61,13 +59,7 @@ function getTimeOfDay(hour) {
 }
 
 function updateThemeAndBackground(timeOfDay) {
-  if (timeOfDay === 'day') {
-    widgetContainer.classList.add('day-bg');
-    widgetContainer.classList.remove('night-bg');
-  } else {
-    widgetContainer.classList.add('night-bg');
-    widgetContainer.classList.remove('day-bg');
-  }
+  // We no longer change background color on widgetContainer, as viewContainer and video handles it
 }
 
 function getRandomItem(arr, ignoreItem) {
@@ -82,22 +74,24 @@ function getRandomItem(arr, ignoreItem) {
 function fadeInAudio() {
   if (fadeInterval) clearInterval(fadeInterval);
   
-  // Only fade if not muted
   if (bgAudio.muted) return;
   
   bgAudio.volume = 0;
   bgAudio.play().catch(e => console.error("Audio play error:", e));
   
   let currentVolume = 0;
-  const fadeSteps = 20; // 20 steps
-  const fadeDuration = 1500; // 1.5 seconds
+  // Read target volume (might have been changed by tray)
+  const targetVolume = parseFloat(bgAudio.dataset.targetVolume || "1.0");
+  
+  const fadeSteps = 20; 
+  const fadeDuration = 1500; 
   const stepTime = fadeDuration / fadeSteps;
-  const volumeStep = 1.0 / fadeSteps;
+  const volumeStep = targetVolume / fadeSteps;
 
   fadeInterval = setInterval(() => {
     currentVolume += volumeStep;
-    if (currentVolume >= 1) {
-      bgAudio.volume = 1;
+    if (currentVolume >= targetVolume) {
+      bgAudio.volume = targetVolume;
       clearInterval(fadeInterval);
       fadeInterval = null;
     } else {
@@ -115,7 +109,7 @@ async function triggerVideo(timeOfDay) {
     bgVideo.src = convertFileSrc(resourcePath);
     
     bgVideo.classList.remove('hidden');
-    clockDisplay.classList.add('hidden'); // Hide clock when video plays
+    viewContainer.classList.add('hidden'); // Hide clock when video plays
     isPlayingVideo = true;
     
     bgVideo.play().catch(e => console.error("Video play error:", e));
@@ -126,7 +120,7 @@ async function triggerVideo(timeOfDay) {
 
 function hideVideo() {
   bgVideo.classList.add('hidden');
-  clockDisplay.classList.remove('hidden'); // Show clock when video stops
+  viewContainer.classList.remove('hidden'); // Show clock when video stops
   isPlayingVideo = false;
   bgVideo.pause();
 }
@@ -155,6 +149,17 @@ bgAudio.addEventListener('ended', () => {
   }
 });
 
+function toggleColors() {
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+  const pColor = style.getPropertyValue('--primary-color').trim();
+  const sColor = style.getPropertyValue('--secondary-color').trim();
+  
+  // Swap them
+  root.style.setProperty('--primary-color', sColor);
+  root.style.setProperty('--secondary-color', pColor);
+}
+
 // Clock Logic
 function updateClock() {
   const now = new Date();
@@ -162,15 +167,34 @@ function updateClock() {
   const m = now.getMinutes();
   const s = now.getSeconds();
   
+  if (s !== lastTickSecond) {
+    lastTickSecond = s;
+    
+    // Animate every second
+    if (clockTickCount === 0) {
+      viewContainer.className = "overlay top-to-bottom";
+    } else if (clockTickCount === 1) {
+      viewContainer.className = "overlay right-to-left";
+    } else if (clockTickCount === 2) {
+      viewContainer.className = "overlay bottom-to-top";
+    } else if (clockTickCount === 3) {
+      viewContainer.className = "overlay left-to-right";
+    }
+    
+    clockTickCount = (clockTickCount + 1) % 4;
+    toggleColors();
+  }
+  
   const hStr = String(h).padStart(2, '0');
   const mStr = String(m).padStart(2, '0');
   const sStr = String(s).padStart(2, '0');
-  clockDisplay.textContent = `${hStr}:${mStr}:${sStr}`;
+  const timeString = `${hStr}:${mStr}:${sStr}`;
+  time1El.textContent = timeString;
+  time2El.textContent = timeString;
   
   if (!isIdle) return;
   
   const timeOfDay = getTimeOfDay(h);
-  updateThemeAndBackground(timeOfDay);
   
   // 10-second sync interval check
   if (s % 10 === 0) {
@@ -183,23 +207,18 @@ function updateClock() {
   ensureAudioPlaying(timeOfDay);
 }
 
-// Check the clock every 250ms for precise syncing
-setInterval(updateClock, 250);
+// Check the clock every 50ms for precise syncing and visual accuracy
+setInterval(updateClock, 50);
 updateClock();
 
-// Mute Button Logic
-muteBtn.addEventListener('click', () => {
-  let isMuted = !bgAudio.muted;
-  bgAudio.muted = isMuted;
-  
-  if (isMuted) {
-    iconUnmuted.classList.add('hidden');
-    iconMuted.classList.remove('hidden');
-    if (fadeInterval) clearInterval(fadeInterval);
+listen('volume-change', (event) => {
+  const targetVolume = event.payload;
+  bgAudio.dataset.targetVolume = targetVolume;
+  if (targetVolume === 0) {
+    bgAudio.muted = true;
   } else {
-    iconMuted.classList.add('hidden');
-    iconUnmuted.classList.remove('hidden');
-    bgAudio.volume = 1; // restore volume immediately on unmute
+    bgAudio.muted = false;
+    bgAudio.volume = targetVolume;
   }
 });
 

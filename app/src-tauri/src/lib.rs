@@ -1,5 +1,5 @@
 use tauri::{Emitter, Manager};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use std::time::Duration;
 use user_idle::UserIdle;
@@ -88,8 +88,27 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
             
+            // Immediately show window if assets are missing
+            let assets_exist = if let Ok(dir) = app_handle.path().app_data_dir() {
+                dir.join("external_assets").exists()
+            } else {
+                false
+            };
+            if !assets_exist {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            }
+            
+            let vol_100 = MenuItem::with_id(app, "vol_100", "Volume: 100%", true, None::<&str>)?;
+            let vol_75 = MenuItem::with_id(app, "vol_75", "Volume: 75%", true, None::<&str>)?;
+            let vol_50 = MenuItem::with_id(app, "vol_50", "Volume: 50%", true, None::<&str>)?;
+            let vol_25 = MenuItem::with_id(app, "vol_25", "Volume: 25%", true, None::<&str>)?;
+            let vol_0 = MenuItem::with_id(app, "vol_0", "Mute", true, None::<&str>)?;
+            let vol_submenu = Submenu::with_items(app, "Volume", true, &[&vol_100, &vol_75, &vol_50, &vol_25, &vol_0])?;
+            
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i])?;
+            let menu = Menu::with_items(app, &[&vol_submenu, &quit_i])?;
 
             // System Tray setup
             TrayIconBuilder::new()
@@ -99,6 +118,10 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     if event.id.as_ref() == "quit" {
                         app.exit(0);
+                    } else if event.id.as_ref().starts_with("vol_") {
+                        let vol_str = event.id.as_ref().replace("vol_", "");
+                        let vol: f32 = vol_str.parse().unwrap_or(100.0) / 100.0;
+                        let _ = app.emit("volume-change", vol);
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
