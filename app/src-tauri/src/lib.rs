@@ -6,6 +6,24 @@ use user_idle::UserIdle;
 use std::io::Write;
 use zip::ZipArchive;
 
+fn update_tray_status(app: &tauri::AppHandle, status: &str) {
+    if let Some(tray) = app.tray_by_id("main_tray") {
+        let _ = tray.set_tooltip(Some(status));
+        if let Some(menu) = tray.menu() {
+            if let Some(item) = menu.get("download") {
+                if let Some(menu_item) = item.as_menuitem() {
+                    let _ = menu_item.set_text(status);
+                    if status.starts_with("Downloading") || status.starts_with("Extract") {
+                        let _ = menu_item.set_enabled(false);
+                    } else {
+                        let _ = menu_item.set_enabled(true);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn check_assets_exist(app: tauri::AppHandle) -> bool {
     if let Ok(dir) = app.path().app_data_dir() {
@@ -40,7 +58,7 @@ fn exit_app(app: tauri::AppHandle) {
 async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String> {
     let url = "https://github.com/saintation/uniqlock/archive/0b6d31c3ac8baaeb800df17418cd0c37909a9698.zip";
     
-    let _ = app.emit("download-progress", "Downloading media archive (1.3GB)... This may take a few minutes.");
+    update_tray_status(&app, "Downloading media (0MB)...");
     
     let mut response = reqwest::get(url).await.map_err(|e| e.to_string())?;
     
@@ -48,11 +66,15 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
     let zip_path = temp_dir.join("uniqlock_assets.zip");
     let mut file = std::fs::File::create(&zip_path).map_err(|e| e.to_string())?;
     
+    let mut downloaded_bytes = 0;
     while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
         file.write_all(&chunk).map_err(|e| e.to_string())?;
+        downloaded_bytes += chunk.len();
+        let mb = downloaded_bytes / (1024 * 1024);
+        update_tray_status(&app, &format!("Downloading media ({}MB)...", mb));
     }
     
-    let _ = app.emit("download-progress", "Extracting media files...");
+    update_tray_status(&app, "Extracting media files...");
     
     let file = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
     let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
@@ -92,7 +114,7 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
     }
     
     let _ = std::fs::remove_file(zip_path);
-    let _ = app.emit("download-progress", "Done");
+    update_tray_status(&app, "Download Complete!");
     Ok(())
 }
 
@@ -116,7 +138,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&vol_submenu, &download_i, &quit_i])?;
 
             // System Tray setup
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id("main_tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("UniQlock")
                 .menu(&menu)
@@ -124,19 +146,13 @@ pub fn run() {
                     if event.id.as_ref() == "quit" {
                         app.exit(0);
                     } else if event.id.as_ref() == "download" {
-                        if let Some(window) = app.get_webview_window("main") {
-                            // Position it if needed, or just show
-                            if let Ok(Some(monitor)) = window.current_monitor() {
-                                let size = window.outer_size().unwrap_or_default();
-                                let monitor_size = monitor.size();
-                                let x = monitor_size.width.saturating_sub(size.width + 20) as i32;
-                                let y = monitor_size.height.saturating_sub(size.height + 40) as i32;
-                                let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = download_and_extract_assets(app_handle.clone()).await {
+                                update_tray_status(&app_handle, &format!("Download Error"));
+                                println!("Download failed: {}", e);
                             }
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            let _ = app.emit("start-download", ());
-                        }
+                        });
                     } else if event.id.as_ref().starts_with("vol_") {
                         let vol_str = event.id.as_ref().replace("vol_", "");
                         let vol: f32 = vol_str.parse().unwrap_or(100.0) / 100.0;

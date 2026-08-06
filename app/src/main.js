@@ -4,10 +4,7 @@ const bgAudio = document.getElementById('bg-audio');
 const viewContainer = document.getElementById('viewContainer');
 const time1El = document.querySelector('#time1 .time');
 const time2El = document.querySelector('#time2 .time');
-const downloadPrompt = document.getElementById('download-prompt');
-const downloadStatus = document.getElementById('download-status');
-const btnYes = document.getElementById('btn-download-yes');
-const btnNo = document.getElementById('btn-download-no');
+
 
 let isIdle = false;
 let isPlayingVideo = false;
@@ -253,36 +250,4 @@ function hideWindowIfNotIdle() {
   }
 }
 
-listen('start-download', () => {
-  downloadPrompt.classList.remove('hidden');
-});
 
-btnNo.addEventListener('click', async () => {
-  downloadPrompt.classList.add('hidden');
-  hideWindowIfNotIdle();
-});
-
-btnYes.addEventListener('click', async () => {
-  btnYes.disabled = true;
-  btnNo.disabled = true;
-  downloadStatus.textContent = "Connecting to GitHub...";
-  
-  const unlisten = await listen('download-progress', (e) => {
-    downloadStatus.textContent = e.payload;
-  });
-
-  try {
-    await invoke("download_and_extract_assets");
-    downloadStatus.textContent = "Download complete!";
-    setTimeout(() => {
-      downloadPrompt.classList.add('hidden');
-      unlisten();
-      hideWindowIfNotIdle();
-    }, 1500);
-  } catch (error) {
-    downloadStatus.textContent = "Error: " + error;
-    downloadStatus.style.color = "#f44336";
-    btnYes.disabled = false;
-    btnNo.disabled = false;
-  }
-});
