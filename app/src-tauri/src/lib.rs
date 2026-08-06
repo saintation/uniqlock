@@ -16,6 +16,15 @@ fn check_assets_exist(app: tauri::AppHandle) -> bool {
 }
 
 #[tauri::command]
+fn get_asset_path(app: tauri::AppHandle, filename: String) -> String {
+    if let Ok(dir) = app.path().app_data_dir() {
+        let assets_dir = dir.join("external_assets").join(filename);
+        return assets_dir.to_string_lossy().to_string();
+    }
+    "".to_string()
+}
+
+#[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -84,7 +93,7 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![check_assets_exist, download_and_extract_assets, exit_app])
+        .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, download_and_extract_assets, exit_app])
         .setup(|app| {
             let app_handle = app.handle().clone();
             

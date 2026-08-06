@@ -13,7 +13,6 @@ let fadeInterval = null;
 let clockTickCount = 0;
 let lastTickSecond = -1;
 
-const { appDataDir, join } = window.__TAURI__.path;
 const { convertFileSrc, invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const { getCurrentWindow } = window.__TAURI__.window;
@@ -47,8 +46,7 @@ const mediaAssets = {
 };
 
 async function getLocalAssetPath(relativePath) {
-  const dataDir = await appDataDir();
-  return await join(dataDir, "external_assets", relativePath);
+  return await invoke("get_asset_path", { filename: relativePath });
 }
 
 function getTimeOfDay(hour) {

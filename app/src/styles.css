@@ -101,16 +101,16 @@ body {
 
 /* Clock Tick Animations */
 #viewContainer.top-to-bottom #time2 {
-  animation: animateTopToBottom 800ms forwards cubic-bezier(.1,1,.2,1);
+  animation: animateTopToBottom 1000ms forwards ease-in-out;
 }
 #viewContainer.right-to-left #time2 {
-  animation: animateRightToLeft 800ms forwards cubic-bezier(.1,1,.2,1);
+  animation: animateRightToLeft 1000ms forwards ease-in-out;
 }
 #viewContainer.bottom-to-top #time2 {
-  animation: animateBottomToTop 800ms forwards cubic-bezier(.1,1,.2,1);
+  animation: animateBottomToTop 1000ms forwards ease-in-out;
 }
 #viewContainer.left-to-right #time2 {
-  animation: animateLeftToRight 800ms forwards cubic-bezier(.1,1,.2,1);
+  animation: animateLeftToRight 1000ms forwards ease-in-out;
 }
 
 @keyframes animateTopToBottom {
