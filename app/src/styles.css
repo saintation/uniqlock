@@ -87,7 +87,12 @@ body {
   letter-spacing: 0.1em;
   text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.7);
   pointer-events: none; /* Let drag events pass through to the overlay */
-  transition: color var(--transition-speed) ease-in-out;
+  transition: color var(--transition-speed) ease-in-out, opacity 0.5s ease-in-out;
+  opacity: 1;
+}
+
+#clock-display.hidden {
+  opacity: 0;
 }
 
 /* Controls */

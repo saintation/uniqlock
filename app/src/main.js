@@ -8,33 +8,38 @@ const iconUnmuted = document.getElementById('icon-unmuted');
 
 let isIdle = false;
 let isPlayingVideo = false;
+let lastTriggeredSecond = -1;
+let lastPlayedVideo = "";
+let fadeInterval = null;
 
-const RAW_URL_BASE = "https://raw.githubusercontent.com/saintation/uniqlock/0b6d31c3ac8baaeb800df17418cd0c37909a9698/reference/assets/";
+const { resolveResource } = window.__TAURI__.path;
+const { convertFileSrc } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 
 // Grouped by Day (06:00 - 20:59) and Night (21:00 - 05:59)
 const mediaAssets = {
   day: {
     videos: [
-      "videos/Season 2/Season 2 - Day - 21.webm",
-      "videos/Season 4/Season 4 - Day - 22.webm"
+      "external_assets/videos/Season 2/Season 2 - Day - 21.webm",
+      "external_assets/videos/Season 4/Season 4 - Day - 22.webm"
     ],
     audio: [
-      "music/00 - Season 1.ogg",
-      "music/01 - Season 1.ogg",
-      "music/04 - Season 2.ogg",
-      "music/05 - Season 3.ogg",
-      "music/09 - Season 5.ogg"
+      "external_assets/music/00 - Season 1.ogg",
+      "external_assets/music/01 - Season 1.ogg",
+      "external_assets/music/04 - Season 2.ogg",
+      "external_assets/music/05 - Season 3.ogg",
+      "external_assets/music/09 - Season 5.ogg"
     ]
   },
   night: {
     videos: [
-      "videos/Season 4/Season 4 - Night - 32.webm",
-      "videos/Season 2/Season 2 - Night - 15.webm",
-      "videos/Season 4/Season 4 - Night - 05.webm"
+      "external_assets/videos/Season 4/Season 4 - Night - 32.webm",
+      "external_assets/videos/Season 2/Season 2 - Night - 15.webm",
+      "external_assets/videos/Season 4/Season 4 - Night - 05.webm"
     ],
     audio: [
-      "music/Night - 01 - Season 2.ogg",
-      "music/Night - 02 - Season 4.ogg"
+      "external_assets/music/Night - 01 - Season 2.ogg",
+      "external_assets/music/Night - 02 - Season 4.ogg"
     ]
   }
 };
@@ -56,22 +61,63 @@ function updateThemeAndBackground(timeOfDay) {
   }
 }
 
-function getRandomItem(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+function getRandomItem(arr, ignoreItem) {
+  if (arr.length <= 1) return arr[0];
+  let picked = arr[Math.floor(Math.random() * arr.length)];
+  while (picked === ignoreItem) {
+    picked = arr[Math.floor(Math.random() * arr.length)];
+  }
+  return picked;
 }
 
-function triggerVideo(timeOfDay) {
-  const randomVideo = getRandomItem(mediaAssets[timeOfDay].videos);
-  bgVideo.src = RAW_URL_BASE + randomVideo;
+function fadeInAudio() {
+  if (fadeInterval) clearInterval(fadeInterval);
   
-  bgVideo.classList.remove('hidden');
-  isPlayingVideo = true;
+  // Only fade if not muted
+  if (bgAudio.muted) return;
   
-  bgVideo.play().catch(e => console.error("Video play error:", e));
+  bgAudio.volume = 0;
+  bgAudio.play().catch(e => console.error("Audio play error:", e));
+  
+  let currentVolume = 0;
+  const fadeSteps = 20; // 20 steps
+  const fadeDuration = 1500; // 1.5 seconds
+  const stepTime = fadeDuration / fadeSteps;
+  const volumeStep = 1.0 / fadeSteps;
+
+  fadeInterval = setInterval(() => {
+    currentVolume += volumeStep;
+    if (currentVolume >= 1) {
+      bgAudio.volume = 1;
+      clearInterval(fadeInterval);
+      fadeInterval = null;
+    } else {
+      bgAudio.volume = currentVolume;
+    }
+  }, stepTime);
+}
+
+async function triggerVideo(timeOfDay) {
+  const randomVideo = getRandomItem(mediaAssets[timeOfDay].videos, lastPlayedVideo);
+  lastPlayedVideo = randomVideo;
+  
+  try {
+    const resourcePath = await resolveResource(randomVideo);
+    bgVideo.src = convertFileSrc(resourcePath);
+    
+    bgVideo.classList.remove('hidden');
+    clockDisplay.classList.add('hidden'); // Hide clock when video plays
+    isPlayingVideo = true;
+    
+    bgVideo.play().catch(e => console.error("Video play error:", e));
+  } catch (error) {
+    console.error("Failed to load video resource:", error);
+  }
 }
 
 function hideVideo() {
   bgVideo.classList.add('hidden');
+  clockDisplay.classList.remove('hidden'); // Show clock when video stops
   isPlayingVideo = false;
   bgVideo.pause();
 }
@@ -80,11 +126,16 @@ bgVideo.addEventListener('ended', () => {
   hideVideo();
 });
 
-function ensureAudioPlaying(timeOfDay) {
+async function ensureAudioPlaying(timeOfDay) {
   if (bgAudio.paused && isIdle) {
     const randomAudio = getRandomItem(mediaAssets[timeOfDay].audio);
-    bgAudio.src = RAW_URL_BASE + randomAudio;
-    bgAudio.play().catch(e => console.error("Audio play error:", e));
+    try {
+      const resourcePath = await resolveResource(randomAudio);
+      bgAudio.src = convertFileSrc(resourcePath);
+      fadeInAudio();
+    } catch (error) {
+      console.error("Failed to load audio resource:", error);
+    }
   }
 }
 
@@ -113,8 +164,11 @@ function updateClock() {
   updateThemeAndBackground(timeOfDay);
   
   // 10-second sync interval check
-  if (s % 10 === 0 && !isPlayingVideo) {
-    triggerVideo(timeOfDay);
+  if (s % 10 === 0) {
+    if (!isPlayingVideo && lastTriggeredSecond !== s) {
+      lastTriggeredSecond = s; // Ensure it only fires exactly once for this second
+      triggerVideo(timeOfDay);
+    }
   }
   
   ensureAudioPlaying(timeOfDay);
@@ -125,21 +179,20 @@ setInterval(updateClock, 250);
 updateClock();
 
 // Mute Button Logic
-let isMuted = false;
 muteBtn.addEventListener('click', () => {
-  isMuted = !isMuted;
+  isMuted = !bgAudio.muted;
   bgAudio.muted = isMuted;
   
   if (isMuted) {
     iconUnmuted.classList.add('hidden');
     iconMuted.classList.remove('hidden');
+    if (fadeInterval) clearInterval(fadeInterval);
   } else {
     iconMuted.classList.add('hidden');
     iconUnmuted.classList.remove('hidden');
+    bgAudio.volume = 1; // restore volume immediately on unmute
   }
 });
-
-const { listen } = window.__TAURI__.event;
 
 listen('idle-state-changed', (event) => {
   isIdle = event.payload;
@@ -148,10 +201,6 @@ listen('idle-state-changed', (event) => {
     // Go Idle! 
     widgetContainer.classList.remove('hidden');
     
-    // We do NOT trigger video immediately unless it's a 10s mark.
-    // updateClock will handle it.
-    
-    // Start audio right away
     const timeOfDay = getTimeOfDay(new Date().getHours());
     updateThemeAndBackground(timeOfDay);
     ensureAudioPlaying(timeOfDay);
@@ -160,5 +209,6 @@ listen('idle-state-changed', (event) => {
     widgetContainer.classList.add('hidden');
     hideVideo();
     bgAudio.pause();
+    lastTriggeredSecond = -1;
   }
 });
