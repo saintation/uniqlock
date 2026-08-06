@@ -4,6 +4,10 @@ const bgAudio = document.getElementById('bg-audio');
 const viewContainer = document.getElementById('viewContainer');
 const time1El = document.querySelector('#time1 .time');
 const time2El = document.querySelector('#time2 .time');
+const downloadPrompt = document.getElementById('download-prompt');
+const downloadStatus = document.getElementById('download-status');
+const btnYes = document.getElementById('btn-download-yes');
+const btnNo = document.getElementById('btn-download-no');
 
 let isIdle = false;
 let isPlayingVideo = false;
@@ -107,7 +111,6 @@ async function triggerVideo(timeOfDay) {
     bgVideo.src = convertFileSrc(resourcePath);
     
     bgVideo.classList.remove('hidden');
-    viewContainer.classList.add('hidden'); // Hide clock when video plays
     isPlayingVideo = true;
     
     bgVideo.play().catch(e => console.error("Video play error:", e));
@@ -118,7 +121,6 @@ async function triggerVideo(timeOfDay) {
 
 function hideVideo() {
   bgVideo.classList.add('hidden');
-  viewContainer.classList.remove('hidden'); // Show clock when video stops
   isPlayingVideo = false;
   bgVideo.pause();
 }
@@ -169,23 +171,18 @@ function updateClock() {
     lastTickSecond = s;
     
     // Animate every second
-    let currentClasses = "overlay";
-    if (isPlayingVideo) {
-      currentClasses += " hidden";
-    } else {
-      if (clockTickCount === 0) {
-        currentClasses += " top-to-bottom";
-      } else if (clockTickCount === 1) {
-        currentClasses += " right-to-left";
-      } else if (clockTickCount === 2) {
-        currentClasses += " bottom-to-top";
-      } else if (clockTickCount === 3) {
-        currentClasses += " left-to-right";
-      }
-      clockTickCount = (clockTickCount + 1) % 4;
-      toggleColors();
+    if (clockTickCount === 0) {
+      viewContainer.className = "overlay top-to-bottom";
+    } else if (clockTickCount === 1) {
+      viewContainer.className = "overlay right-to-left";
+    } else if (clockTickCount === 2) {
+      viewContainer.className = "overlay bottom-to-top";
+    } else if (clockTickCount === 3) {
+      viewContainer.className = "overlay left-to-right";
     }
-    viewContainer.className = currentClasses;
+    
+    clockTickCount = (clockTickCount + 1) % 4;
+    toggleColors();
   }
   
   const hStr = String(h).padStart(2, '0');

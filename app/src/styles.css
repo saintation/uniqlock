@@ -44,12 +44,13 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 0;
+  z-index: 20;
   opacity: 1;
   transition: opacity 0.5s ease-in-out;
 }
 #bg-video.hidden {
   opacity: 0;
+  pointer-events: none;
 }
 
 /* Overlay & Drag Region */
