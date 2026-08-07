@@ -1,8 +1,6 @@
 # UniQlock (Remake)
 
-![UniQlock](https://github.com/saintation/uniqlock/raw/master/app/icons/128x128.png)
-
-A modern desktop remake of the legendary [UNIQLOCK](https://en.wikipedia.org/wiki/Uniqlock) widget, built with Tauri and web technologies. This app recreates the iconic time-synchronized dance videos and music that adapt to your local time (Day, Night, and Top of the Hour).
+A modern desktop remake of the legendary [UNIQLOCK](https://www.uniqlo.com/hk/corp/media/projects/uniqlock/) widget, built with Tauri and web technologies. This app recreates the iconic time-synchronized dance videos and music that adapt to your local time (Day, Night, and Top of the Hour).
 
 ## Features
 - **Accurate Time Sync**: Synchronizes seamlessly with your local clock.
@@ -20,7 +18,7 @@ Special thanks and full credit to the [megajerk/uniqlock](https://github.com/meg
 
 # 유니클락 (리메이크)
 
-Tauri와 최신 웹 기술로 다시 태어난 전설적인 바탕화면 위젯 [UNIQLOCK](https://ko.wikipedia.org/wiki/유니클락)의 현대판 리메이크입니다. 여러분의 로컬 시간에 맞춰 낮, 밤, 그리고 정각마다 변화하는 댄스 영상과 매력적인 시보 음악을 바탕화면에서 만나보세요.
+Tauri와 최신 웹 기술로 다시 태어난 전설적인 바탕화면 위젯 [UNIQLOCK](https://www.uniqlo.com/hk/corp/media/projects/uniqlock/)의 현대판 리메이크입니다. 여러분의 로컬 시간에 맞춰 낮, 밤, 그리고 정각마다 변화하는 댄스 영상과 매력적인 시보 음악을 바탕화면에서 만나보세요.
 
 ## 주요 기능
 - **정확한 시간 동기화**: 로컬 시계와 완벽하게 맞춰서 작동합니다.
