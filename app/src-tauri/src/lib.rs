@@ -9,17 +9,13 @@ use zip::ZipArchive;
 fn update_tray_status(app: &tauri::AppHandle, status: &str) {
     if let Some(tray) = app.tray_by_id("main_tray") {
         let _ = tray.set_tooltip(Some(status));
-        if let Some(menu) = tray.menu() {
-            if let Some(item) = menu.get("download") {
-                if let Some(menu_item) = item.as_menuitem() {
-                    let _ = menu_item.set_text(status);
-                    if status.starts_with("Downloading") || status.starts_with("Extract") {
-                        let _ = menu_item.set_enabled(false);
-                    } else {
-                        let _ = menu_item.set_enabled(true);
-                    }
-                }
-            }
+    }
+    if let Some(menu_item) = app.try_state::<tauri::menu::MenuItem<tauri::Wry>>() {
+        let _ = menu_item.set_text(status);
+        if status.starts_with("Downloading") || status.starts_with("Extract") {
+            let _ = menu_item.set_enabled(false);
+        } else {
+            let _ = menu_item.set_enabled(true);
         }
     }
 }
@@ -134,6 +130,7 @@ pub fn run() {
             let vol_submenu = Submenu::with_items(app, "Volume", true, &[&vol_100, &vol_75, &vol_50, &vol_25, &vol_0])?;
             
             let download_i = MenuItem::with_id(app, "download", "Download Media Assets", true, None::<&str>)?;
+            app_handle.manage(download_i.clone());
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&vol_submenu, &download_i, &quit_i])?;
 
