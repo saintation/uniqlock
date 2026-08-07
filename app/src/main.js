@@ -15,6 +15,7 @@ let lastPlayedVideo = "";
 let fadeInterval = null;
 let clockTickCount = 0;
 let lastTickSecond = -1;
+let lastAudioMinute = -1;
 
 const { convertFileSrc, invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -71,33 +72,17 @@ function getRandomItem(arr, ignoreItem) {
   return picked;
 }
 
-function fadeInAudio() {
-  if (fadeInterval) clearInterval(fadeInterval);
+function playAudio() {
+  if (fadeInterval) {
+    clearInterval(fadeInterval);
+    fadeInterval = null;
+  }
   
   if (bgAudio.muted) return;
   
-  bgAudio.volume = 0;
-  bgAudio.play().catch(e => console.error("Audio play error:", e));
-  
-  let currentVolume = 0;
-  // Read target volume (might have been changed by tray)
   const targetVolume = parseFloat(bgAudio.dataset.targetVolume || "1.0");
-  
-  const fadeSteps = 20; 
-  const fadeDuration = 1500; 
-  const stepTime = fadeDuration / fadeSteps;
-  const volumeStep = targetVolume / fadeSteps;
-
-  fadeInterval = setInterval(() => {
-    currentVolume += volumeStep;
-    if (currentVolume >= targetVolume) {
-      bgAudio.volume = targetVolume;
-      clearInterval(fadeInterval);
-      fadeInterval = null;
-    } else {
-      bgAudio.volume = currentVolume;
-    }
-  }, stepTime);
+  bgAudio.volume = targetVolume;
+  bgAudio.play().catch(e => console.error("Audio play error:", e));
 }
 
 async function triggerVideo(timeOfDay) {
@@ -142,16 +127,23 @@ bgVideo.addEventListener('ended', () => {
   hideVideo();
 });
 
-async function ensureAudioPlaying(timeOfDay) {
+async function ensureAudioPlaying(timeOfDay, s, m) {
   if (!hasStartedVideo) return;
-  if (bgAudio.paused && isIdle) {
+  
+  let forceNew = false;
+  if (s === 0 && lastAudioMinute !== m) {
+    lastAudioMinute = m;
+    forceNew = true;
+  }
+  
+  if (forceNew || (bgAudio.paused && isIdle)) {
     const auds = timeOfDay === 'day' ? mediaAssets.day_audio : mediaAssets.night_audio;
     if (!auds || auds.length === 0) return;
     const randomAudio = getRandomItem(auds);
     try {
       const resourcePath = await getLocalAssetPath(randomAudio);
       bgAudio.src = convertFileSrc(resourcePath);
-      fadeInAudio();
+      playAudio();
     } catch (error) {
       console.error("Failed to load audio resource:", error);
     }
@@ -161,7 +153,7 @@ async function ensureAudioPlaying(timeOfDay) {
 bgAudio.addEventListener('ended', () => {
   if (isIdle) {
     const now = new Date();
-    ensureAudioPlaying(getTimeOfDay(now.getHours()));
+    ensureAudioPlaying(getTimeOfDay(now.getHours()), now.getSeconds(), now.getMinutes());
   }
 });
 
@@ -255,7 +247,7 @@ function updateClock() {
     }
   }
   
-  ensureAudioPlaying(timeOfDay);
+  ensureAudioPlaying(timeOfDay, s, m);
 }
 
 // Check the clock every 50ms for precise syncing and visual accuracy
@@ -280,9 +272,10 @@ listen('idle-state-changed', (event) => {
     // Go Idle! 
     checkAndLoadMedia().then(() => {
       widgetContainer.classList.remove('hidden');
-      const timeOfDay = getTimeOfDay(new Date().getHours());
+      const now = new Date();
+      const timeOfDay = getTimeOfDay(now.getHours());
       updateThemeAndBackground(timeOfDay);
-      ensureAudioPlaying(timeOfDay);
+      ensureAudioPlaying(timeOfDay, now.getSeconds(), now.getMinutes());
     });
   } else {
     // Wake up! 
@@ -290,6 +283,7 @@ listen('idle-state-changed', (event) => {
     hideVideo();
     bgAudio.pause();
     lastTriggeredSecond = -1;
+    lastAudioMinute = -1;
     hasStartedVideo = false;
   }
 });
