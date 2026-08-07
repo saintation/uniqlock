@@ -192,10 +192,19 @@ pub fn run() {
             let size_l = MenuItem::with_id(app, "size_large", "Size: Large", true, None::<&str>)?;
             let size_submenu = Submenu::with_items(app, "Size", true, &[&size_s, &size_m, &size_l])?;
             
+            let idle_5s = MenuItem::with_id(app, "idle_5", "5 Seconds", true, None::<&str>)?;
+            let idle_30s = MenuItem::with_id(app, "idle_30", "30 Seconds", true, None::<&str>)?;
+            let idle_1m = MenuItem::with_id(app, "idle_60", "1 Minute", true, None::<&str>)?;
+            let idle_5m = MenuItem::with_id(app, "idle_300", "5 Minutes", true, None::<&str>)?;
+            let idle_submenu = Submenu::with_items(app, "Idle Time", true, &[&idle_5s, &idle_30s, &idle_1m, &idle_5m])?;
+            
+            let idle_threshold = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5));
+            app_handle.manage(idle_threshold.clone());
+            
             let download_i = MenuItem::with_id(app, "download", "Download Media Assets", true, None::<&str>)?;
             app_handle.manage(download_i.clone());
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&vol_submenu, &size_submenu, &download_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&vol_submenu, &size_submenu, &idle_submenu, &download_i, &quit_i])?;
 
             // System Tray setup
             TrayIconBuilder::with_id("main_tray")
@@ -235,6 +244,12 @@ pub fn run() {
                                 let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
                             }
                         }
+                    } else if event.id.as_ref().starts_with("idle_") {
+                        if let Ok(secs) = event.id.as_ref().replace("idle_", "").parse::<u64>() {
+                            if let Some(state) = app.try_state::<std::sync::Arc<std::sync::atomic::AtomicU64>>() {
+                                state.store(secs, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -255,13 +270,12 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Start the OS-level global idle monitoring thread
             std::thread::spawn(move || {
                 let mut was_idle = false;
-                let threshold_secs = 5;
 
                 loop {
                     std::thread::sleep(Duration::from_millis(500));
+                    let threshold_secs = idle_threshold.load(std::sync::atomic::Ordering::Relaxed);
                     if let Ok(idle_time) = UserIdle::get_time() {
                         let is_idle_now = idle_time.as_seconds() >= threshold_secs;
                         if is_idle_now && !was_idle {
