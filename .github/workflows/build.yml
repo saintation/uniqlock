@@ -42,5 +42,5 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'UniQlock v__VERSION__'
           releaseBody: 'Download the installers below to run the app on your PC/Mac.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false

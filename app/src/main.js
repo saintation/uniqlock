@@ -9,6 +9,7 @@ const missingWarning = document.getElementById('missing-warning');
 
 let isIdle = false;
 let isPlayingVideo = false;
+let hasStartedVideo = false;
 let lastTriggeredSecond = -1;
 let lastPlayedVideo = "";
 let fadeInterval = null;
@@ -117,6 +118,7 @@ async function triggerVideo(timeOfDay) {
     
     bgVideo.classList.remove('hidden');
     isPlayingVideo = true;
+    hasStartedVideo = true;
     
     bgVideo.play().catch(e => {
       console.error("Video play error:", e);
@@ -141,6 +143,7 @@ bgVideo.addEventListener('ended', () => {
 });
 
 async function ensureAudioPlaying(timeOfDay) {
+  if (!hasStartedVideo) return;
   if (bgAudio.paused && isIdle) {
     const auds = timeOfDay === 'day' ? mediaAssets.day_audio : mediaAssets.night_audio;
     if (!auds || auds.length === 0) return;
@@ -287,6 +290,7 @@ listen('idle-state-changed', (event) => {
     hideVideo();
     bgAudio.pause();
     lastTriggeredSecond = -1;
+    hasStartedVideo = false;
   }
 });
 
