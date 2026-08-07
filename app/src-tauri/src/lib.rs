@@ -29,6 +29,60 @@ fn check_assets_exist(app: tauri::AppHandle) -> bool {
     false
 }
 
+#[derive(serde::Serialize)]
+struct MediaAssets {
+    day_videos: Vec<String>,
+    day_audio: Vec<String>,
+    night_videos: Vec<String>,
+    night_audio: Vec<String>,
+}
+
+#[tauri::command]
+fn get_media_list(app: tauri::AppHandle) -> MediaAssets {
+    let mut assets = MediaAssets {
+        day_videos: Vec::new(),
+        day_audio: Vec::new(),
+        night_videos: Vec::new(),
+        night_audio: Vec::new(),
+    };
+    
+    if let Ok(dir) = app.path().app_data_dir() {
+        let base_dir = dir.join("external_assets");
+        let mut dirs_to_visit = vec![base_dir.clone()];
+        while let Some(current_dir) = dirs_to_visit.pop() {
+            if let Ok(entries) = std::fs::read_dir(current_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        dirs_to_visit.push(path);
+                    } else if let Some(ext) = path.extension() {
+                        let filename = path.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                        if let Ok(relative) = path.strip_prefix(&base_dir) {
+                            let rel_str = relative.to_string_lossy().replace("\\", "/");
+                            if ext == "webm" || ext == "mp4" {
+                                if filename.contains("- night -") || filename.contains("night") {
+                                    assets.night_videos.push(rel_str);
+                                } else {
+                                    assets.day_videos.push(rel_str);
+                                }
+                            } else if ext == "ogg" || ext == "mp3" {
+                                if filename.contains("night") {
+                                    assets.night_audio.push(rel_str);
+                                } else {
+                                    assets.day_audio.push(rel_str);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback if empty so the JS doesn't crash on empty arrays, but JS handles empty arrays anyway.
+    assets
+}
+
 #[tauri::command]
 fn get_asset_path(app: tauri::AppHandle, filename: String) -> String {
     if let Ok(dir) = app.path().app_data_dir() {
@@ -67,7 +121,7 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded_bytes += chunk.len();
         let mb = downloaded_bytes / (1024 * 1024);
-        update_tray_status(&app, &format!("Downloading media ({}MB)...", mb));
+        update_tray_status(&app, &format!("Downloading media ({}MB / 1.3GB)...", mb));
     }
     
     update_tray_status(&app, "Extracting media files...");
@@ -118,7 +172,7 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, hide_window, download_and_extract_assets, exit_app])
+        .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, hide_window, download_and_extract_assets, exit_app, get_media_list])
         .setup(|app| {
             let app_handle = app.handle().clone();
             
@@ -129,10 +183,15 @@ pub fn run() {
             let vol_0 = MenuItem::with_id(app, "vol_0", "Mute", true, None::<&str>)?;
             let vol_submenu = Submenu::with_items(app, "Volume", true, &[&vol_100, &vol_75, &vol_50, &vol_25, &vol_0])?;
             
+            let size_s = MenuItem::with_id(app, "size_small", "Size: Small", true, None::<&str>)?;
+            let size_m = MenuItem::with_id(app, "size_medium", "Size: Medium", true, None::<&str>)?;
+            let size_l = MenuItem::with_id(app, "size_large", "Size: Large", true, None::<&str>)?;
+            let size_submenu = Submenu::with_items(app, "Size", true, &[&size_s, &size_m, &size_l])?;
+            
             let download_i = MenuItem::with_id(app, "download", "Download Media Assets", true, None::<&str>)?;
             app_handle.manage(download_i.clone());
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&vol_submenu, &download_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&vol_submenu, &size_submenu, &download_i, &quit_i])?;
 
             // System Tray setup
             TrayIconBuilder::with_id("main_tray")
@@ -154,6 +213,24 @@ pub fn run() {
                         let vol_str = event.id.as_ref().replace("vol_", "");
                         let vol: f32 = vol_str.parse().unwrap_or(100.0) / 100.0;
                         let _ = app.emit("volume-change", vol);
+                    } else if event.id.as_ref().starts_with("size_") {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let (w, h) = match event.id.as_ref() {
+                                "size_small" => (426.0, 240.0),
+                                "size_medium" => (640.0, 360.0),
+                                "size_large" => (854.0, 480.0),
+                                _ => (640.0, 360.0),
+                            };
+                            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: w, height: h }));
+                            // reposition to bottom right
+                            if let Ok(Some(monitor)) = window.current_monitor() {
+                                let size = window.outer_size().unwrap_or_default();
+                                let monitor_size = monitor.size();
+                                let x = monitor_size.width.saturating_sub(size.width + 20) as i32;
+                                let y = monitor_size.height.saturating_sub(size.height + 40) as i32;
+                                let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                            }
+                        }
                     }
                 })
                 .on_tray_icon_event(|tray, event| {

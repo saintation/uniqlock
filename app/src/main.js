@@ -4,6 +4,7 @@ const bgAudio = document.getElementById('bg-audio');
 const viewContainer = document.getElementById('viewContainer');
 const time1El = document.querySelector('#time1 .time');
 const time2El = document.querySelector('#time2 .time');
+const missingWarning = document.getElementById('missing-warning');
 
 
 let isIdle = false;
@@ -18,33 +19,32 @@ const { convertFileSrc, invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const { getCurrentWindow } = window.__TAURI__.window;
 
-// Grouped by Day (06:00 - 20:59) and Night (21:00 - 05:59)
-const mediaAssets = {
-  day: {
-    videos: [
-      "videos/Season 2/Season 2 - Day - 21.webm",
-      "videos/Season 4/Season 4 - Day - 22.webm"
-    ],
-    audio: [
-      "music/00 - Season 1.ogg",
-      "music/01 - Season 1.ogg",
-      "music/04 - Season 2.ogg",
-      "music/05 - Season 3.ogg",
-      "music/09 - Season 5.ogg"
-    ]
-  },
-  night: {
-    videos: [
-      "videos/Season 4/Season 4 - Night - 32.webm",
-      "videos/Season 2/Season 2 - Night - 15.webm",
-      "videos/Season 4/Season 4 - Night - 05.webm"
-    ],
-    audio: [
-      "music/Night - 01 - Season 2.ogg",
-      "music/Night - 02 - Season 4.ogg"
-    ]
-  }
+const colorPalette = [
+  "#ED1D24", "#FFA801", "#F1BB3F", "#4FB335", "#3386C8",
+  "#4499BE", "#A6A6FE", "#6BD7D7", "#FF8CC7", "#88BF01",
+  "#B3D6FE", "#EFD000", "#FBBC4A", "#F2914A", "#01B1ED"
+];
+
+let currentBgColor = '#FFFFFF';
+let currentTextColor = '#ED1D24';
+
+// Dynamic media list loaded from Rust
+let mediaAssets = {
+  day_videos: [],
+  day_audio: [],
+  night_videos: [],
+  night_audio: []
 };
+
+async function checkAndLoadMedia() {
+  mediaAssets = await invoke("get_media_list");
+  if (mediaAssets.day_videos.length === 0 && mediaAssets.night_videos.length === 0) {
+    missingWarning.classList.remove('hidden');
+  } else {
+    missingWarning.classList.add('hidden');
+  }
+}
+checkAndLoadMedia();
 
 async function getLocalAssetPath(relativePath) {
   return await invoke("get_asset_path", { filename: relativePath });
@@ -100,7 +100,9 @@ function fadeInAudio() {
 }
 
 async function triggerVideo(timeOfDay) {
-  const randomVideo = getRandomItem(mediaAssets[timeOfDay].videos, lastPlayedVideo);
+  const vids = timeOfDay === 'day' ? mediaAssets.day_videos : mediaAssets.night_videos;
+  if (!vids || vids.length === 0) return;
+  const randomVideo = getRandomItem(vids, lastPlayedVideo);
   lastPlayedVideo = randomVideo;
   
   try {
@@ -134,7 +136,9 @@ bgVideo.addEventListener('ended', () => {
 
 async function ensureAudioPlaying(timeOfDay) {
   if (bgAudio.paused && isIdle) {
-    const randomAudio = getRandomItem(mediaAssets[timeOfDay].audio);
+    const auds = timeOfDay === 'day' ? mediaAssets.day_audio : mediaAssets.night_audio;
+    if (!auds || auds.length === 0) return;
+    const randomAudio = getRandomItem(auds);
     try {
       const resourcePath = await getLocalAssetPath(randomAudio);
       bgAudio.src = convertFileSrc(resourcePath);
@@ -152,15 +156,44 @@ bgAudio.addEventListener('ended', () => {
   }
 });
 
-function toggleColors() {
-  const root = document.documentElement;
-  const style = getComputedStyle(root);
-  const pColor = style.getPropertyValue('--primary-color').trim();
-  const sColor = style.getPropertyValue('--secondary-color').trim();
+let currentState = { bg: '#FFFFFF', text: '#ED1D24' };
+let oldState = { bg: '#FFFFFF', text: '#ED1D24' };
+
+// Initialize styles
+time1El.parentElement.style.backgroundColor = currentState.bg;
+time1El.parentElement.style.color = currentState.text;
+time2El.parentElement.style.backgroundColor = currentState.bg;
+time2El.parentElement.style.color = currentState.text;
+
+function toggleColors(wipeDirection) {
+  const t1 = time1El.parentElement;
+  const t2 = time2El.parentElement;
   
-  // Swap them
-  root.style.setProperty('--primary-color', sColor);
-  root.style.setProperty('--secondary-color', pColor);
+  // Decide next state
+  if (currentState.bg === '#FFFFFF') {
+    oldState = { ...currentState };
+    currentState = { bg: currentState.text, text: '#FFFFFF' };
+  } else {
+    oldState = { ...currentState };
+    currentState = { bg: '#FFFFFF', text: getRandomItem(colorPalette, oldState.bg) };
+  }
+  
+  // Apply depending on wipe direction
+  if (wipeDirection === 'out') {
+    // t2 is disappearing, t1 is being revealed.
+    // t2 MUST keep old state. t1 gets NEW state.
+    t2.style.backgroundColor = oldState.bg;
+    t2.style.color = oldState.text;
+    t1.style.backgroundColor = currentState.bg;
+    t1.style.color = currentState.text;
+  } else {
+    // t2 is appearing, t1 is being covered.
+    // t2 gets NEW state. t1 MUST keep old state.
+    t2.style.backgroundColor = currentState.bg;
+    t2.style.color = currentState.text;
+    t1.style.backgroundColor = oldState.bg;
+    t1.style.color = oldState.text;
+  }
 }
 
 // Clock Logic
@@ -176,16 +209,18 @@ function updateClock() {
     // Animate every second
     if (clockTickCount === 0) {
       viewContainer.className = "overlay top-to-bottom";
+      toggleColors('out');
     } else if (clockTickCount === 1) {
       viewContainer.className = "overlay right-to-left";
+      toggleColors('in');
     } else if (clockTickCount === 2) {
       viewContainer.className = "overlay bottom-to-top";
+      toggleColors('out');
     } else if (clockTickCount === 3) {
       viewContainer.className = "overlay left-to-right";
+      toggleColors('in');
     }
-    
     clockTickCount = (clockTickCount + 1) % 4;
-    toggleColors();
   }
   
   const hStr = String(h).padStart(2, '0');
@@ -230,11 +265,12 @@ listen('idle-state-changed', (event) => {
 
   if (isIdle) {
     // Go Idle! 
-    widgetContainer.classList.remove('hidden');
-    
-    const timeOfDay = getTimeOfDay(new Date().getHours());
-    updateThemeAndBackground(timeOfDay);
-    ensureAudioPlaying(timeOfDay);
+    checkAndLoadMedia().then(() => {
+      widgetContainer.classList.remove('hidden');
+      const timeOfDay = getTimeOfDay(new Date().getHours());
+      updateThemeAndBackground(timeOfDay);
+      ensureAudioPlaying(timeOfDay);
+    });
   } else {
     // Wake up! 
     widgetContainer.classList.add('hidden');
