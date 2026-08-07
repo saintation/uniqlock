@@ -35,6 +35,7 @@ struct MediaAssets {
     day_audio: Vec<String>,
     night_videos: Vec<String>,
     night_audio: Vec<String>,
+    hour_videos: Vec<String>,
 }
 
 #[tauri::command]
@@ -44,6 +45,7 @@ fn get_media_list(app: tauri::AppHandle) -> MediaAssets {
         day_audio: Vec::new(),
         night_videos: Vec::new(),
         night_audio: Vec::new(),
+        hour_videos: Vec::new(),
     };
     
     if let Ok(dir) = app.path().app_data_dir() {
@@ -60,7 +62,9 @@ fn get_media_list(app: tauri::AppHandle) -> MediaAssets {
                         if let Ok(relative) = path.strip_prefix(&base_dir) {
                             let rel_str = relative.to_string_lossy().replace("\\", "/");
                             if ext == "webm" || ext == "mp4" {
-                                if filename.contains("- night -") || filename.contains("night") {
+                                if filename.contains("hour") {
+                                    assets.hour_videos.push(rel_str);
+                                } else if filename.contains("- night -") || filename.contains("night") {
                                     assets.night_videos.push(rel_str);
                                 } else {
                                     assets.day_videos.push(rel_str);

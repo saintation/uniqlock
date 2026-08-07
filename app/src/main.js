@@ -28,12 +28,12 @@ const colorPalette = [
 let currentBgColor = '#FFFFFF';
 let currentTextColor = '#ED1D24';
 
-// Dynamic media list loaded from Rust
 let mediaAssets = {
   day_videos: [],
   day_audio: [],
   night_videos: [],
-  night_audio: []
+  night_audio: [],
+  hour_videos: []
 };
 
 async function checkAndLoadMedia() {
@@ -100,7 +100,13 @@ function fadeInAudio() {
 }
 
 async function triggerVideo(timeOfDay) {
-  const vids = timeOfDay === 'day' ? mediaAssets.day_videos : mediaAssets.night_videos;
+  let vids = timeOfDay === 'day' ? mediaAssets.day_videos : mediaAssets.night_videos;
+  if (timeOfDay === 'hour') {
+    vids = mediaAssets.hour_videos;
+    if (!vids || vids.length === 0) {
+      vids = getTimeOfDay(new Date().getHours()) === 'day' ? mediaAssets.day_videos : mediaAssets.night_videos;
+    }
+  }
   if (!vids || vids.length === 0) return;
   const randomVideo = getRandomItem(vids, lastPlayedVideo);
   lastPlayedVideo = randomVideo;
@@ -238,7 +244,11 @@ function updateClock() {
   if (s % 10 === 0) {
     if (!isPlayingVideo && lastTriggeredSecond !== s) {
       lastTriggeredSecond = s; // Ensure it only fires exactly once for this second
-      triggerVideo(timeOfDay);
+      if (m === 0 && s === 0) {
+        triggerVideo('hour');
+      } else {
+        triggerVideo(timeOfDay);
+      }
     }
   }
   
