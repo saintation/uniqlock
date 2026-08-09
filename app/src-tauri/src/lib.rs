@@ -176,6 +176,12 @@ async fn download_and_extract_assets(app: tauri::AppHandle) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![check_assets_exist, get_asset_path, hide_window, download_and_extract_assets, exit_app, get_media_list])
         .setup(|app| {
             let app_handle = app.handle().clone();
