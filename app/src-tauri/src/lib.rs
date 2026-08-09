@@ -1,5 +1,5 @@
 use tauri::{Emitter, Manager};
-use tauri::menu::{Menu, MenuItem, Submenu};
+use tauri::menu::{Menu, MenuItem, Submenu, CheckMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use std::time::Duration;
 use user_idle::UserIdle;
@@ -203,8 +203,15 @@ pub fn run() {
             
             let download_i = MenuItem::with_id(app, "download", "Download Media Assets", true, None::<&str>)?;
             app_handle.manage(download_i.clone());
+            
+            let always_on_i = CheckMenuItem::with_id(app, "always_on", "Always On", true, false, None::<&str>)?;
+            app_handle.manage(always_on_i.clone());
+            
+            let always_on_state = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            app_handle.manage(always_on_state.clone());
+            
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&vol_submenu, &size_submenu, &idle_submenu, &download_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&vol_submenu, &size_submenu, &idle_submenu, &always_on_i, &download_i, &quit_i])?;
 
             // System Tray setup
             TrayIconBuilder::with_id("main_tray")
@@ -250,6 +257,13 @@ pub fn run() {
                                 state.store(secs, std::sync::atomic::Ordering::Relaxed);
                             }
                         }
+                    } else if event.id.as_ref() == "always_on" {
+                        if let Some(menu_item) = app.try_state::<tauri::menu::CheckMenuItem<tauri::Wry>>() {
+                            let is_checked = menu_item.is_checked().unwrap_or(false);
+                            if let Some(state) = app.try_state::<std::sync::Arc<std::sync::atomic::AtomicBool>>() {
+                                state.store(is_checked, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -276,9 +290,17 @@ pub fn run() {
                 loop {
                     std::thread::sleep(Duration::from_millis(500));
                     let threshold_secs = idle_threshold.load(std::sync::atomic::Ordering::Relaxed);
-                    if let Ok(idle_time) = UserIdle::get_time() {
-                        let is_idle_now = idle_time.as_seconds() >= threshold_secs;
-                        if is_idle_now && !was_idle {
+                    let is_always_on = always_on_state.load(std::sync::atomic::Ordering::Relaxed);
+                    
+                    let is_idle_now = if is_always_on {
+                        true
+                    } else if let Ok(idle_time) = UserIdle::get_time() {
+                        idle_time.as_seconds() >= threshold_secs
+                    } else {
+                        false
+                    };
+
+                    if is_idle_now && !was_idle {
                             was_idle = true;
                             if let Some(window) = app_handle.get_webview_window("main") {
                                 if let Ok(Some(monitor)) = window.current_monitor() {
@@ -298,7 +320,6 @@ pub fn run() {
                             }
                             let _ = app_handle.emit("idle-state-changed", false);
                         }
-                    }
                 }
             });
             Ok(())
