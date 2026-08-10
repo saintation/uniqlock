@@ -11,6 +11,15 @@ A modern desktop remake of the legendary [UNIQLOCK](https://www.uniqlo.com/hk/co
 - **Dynamic Colors**: Features an array of vibrant colors (including the classic UNIQLO Red) with flawlessly replicated wipe animations.
 - **Idle Mode**: The widget gracefully hides itself while you are active and smoothly fades in when your PC is idle for 5 seconds.
 
+## Tray Menu Options
+Right-click the UniQlock icon in your system tray to access the following settings:
+- **Volume**: Adjust the playback volume (Mute, 25%, 50%, 75%, 100%).
+- **Size**: Change the widget window size (Small, Medium, Large).
+- **Idle Time**: Set how long the PC needs to be inactive before the widget appears (5 Seconds, 30 Seconds, 1 Minute, 5 Minutes).
+- **Always On**: Check this option to keep the widget visible at all times, regardless of your keyboard/mouse activity.
+- **Download Media Assets**: Triggers the background download of the required video and audio assets.
+- **Quit**: Completely exit the application.
+
 ## Acknowledgements 
 Special thanks and full credit to the [megajerk/uniqlock](https://github.com/megajerk/uniqlock) repository. This project was heavily inspired by their incredible work preserving the original UNIQLOCK assets and logic. Their repository provided the foundational understanding and media archive necessary to bring this legendary widget back to the modern desktop.
 
@@ -28,6 +37,15 @@ Tauri와 최신 웹 기술로 다시 태어난 전설적인 바탕화면 위젯 
 - **반응형 크기 조절**: 트레이 메뉴에서 Small, Medium, Large 크기를 자유롭게 변경할 수 있으며, 비율과 폰트 크기가 완벽하게 자동 조정됩니다.
 - **다이내믹 컬러 애니메이션**: 오리지널 유니클로 레드를 포함한 다채로운 색상 팔레트가 화면 전환 애니메이션과 함께 아름답게 교차됩니다.
 - **자동 숨김 모드 (Idle Mode)**: PC를 사용하는 동안에는 위젯이 방해되지 않도록 숨어있다가, 마우스나 키보드 입력이 5초 이상 없으면 자연스럽게 바탕화면에 나타납니다.
+
+## 트레이 메뉴 사용법
+우측 하단 시스템 트레이의 유니클락 아이콘을 우클릭하면 다음 메뉴들을 사용할 수 있습니다:
+- **Volume (볼륨)**: 재생 음량을 조절합니다 (음소거, 25%, 50%, 75%, 100%).
+- **Size (크기)**: 위젯 창의 크기를 변경합니다 (Small, Medium, Large).
+- **Idle Time (대기 시간)**: 마우스/키보드 입력이 멈춘 후 위젯이 나타나기까지의 대기 시간을 설정합니다 (5초, 30초, 1분, 5분).
+- **Always On (항상 위젯 켜기)**: 이 항목을 체크하면 입력 상태와 관계없이 위젯을 항상 화면에 띄워둘 수 있습니다.
+- **Download Media Assets (미디어 다운로드)**: 위젯 실행에 필요한 고화질 영상/오디오 에셋을 백그라운드에서 다운로드합니다.
+- **Quit (종료)**: 애플리케이션을 완전히 종료합니다.
 
 ## 감사의 글
 이 프로젝트는 [megajerk/uniqlock](https://github.com/megajerk/uniqlock) 저장소의 훌륭한 작업물에서 큰 영감을 받아 제작되었습니다. 오리지널 유니클락의 방대한 미디어 에셋을 보존하고 복원해주신 그들의 헌신적인 노력이 없었다면 이 프로젝트는 불가능했을 것입니다. 유니클락을 현대 데스크톱으로 다시 불러올 수 있게 큰 도움을 준 megajerk 님께 깊은 감사를 전합니다.
