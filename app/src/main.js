@@ -1,6 +1,8 @@
 const widgetContainer = document.getElementById('widget-container');
 const bgVideo = document.getElementById('bg-video');
-const bgAudio = document.getElementById('bg-audio');
+const bgAudio1 = document.getElementById('bg-audio');
+const bgAudio2 = new Audio();
+let activeAudio = bgAudio1;
 const viewContainer = document.getElementById('viewContainer');
 const time1El = document.querySelector('#time1 .time');
 const time2El = document.querySelector('#time2 .time');
@@ -12,7 +14,6 @@ let isPlayingVideo = false;
 let hasStartedVideo = false;
 let lastTriggeredSecond = -1;
 let lastPlayedVideo = "";
-let fadeInterval = null;
 let clockTickCount = 0;
 let lastTickSecond = -1;
 let lastAudioMinute = -1;
@@ -72,17 +73,36 @@ function getRandomItem(arr, ignoreItem) {
   return picked;
 }
 
-function playAudio() {
-  if (fadeInterval) {
-    clearInterval(fadeInterval);
-    fadeInterval = null;
-  }
+function fadeOutAudio(audioObj) {
+  if (!audioObj || audioObj.paused || audioObj.muted) return;
+  const initialVol = audioObj.volume;
+  if (initialVol <= 0) return;
   
-  if (bgAudio.muted) return;
+  const fadeSteps = 20;
+  const fadeDuration = 1000; 
+  const stepTime = fadeDuration / fadeSteps;
+  const volumeStep = initialVol / fadeSteps;
+  let currentVolume = initialVol;
+
+  const fadeOutInterval = setInterval(() => {
+    currentVolume -= volumeStep;
+    if (currentVolume <= 0) {
+      audioObj.volume = 0;
+      audioObj.pause();
+      audioObj.removeAttribute('src');
+      clearInterval(fadeOutInterval);
+    } else {
+      audioObj.volume = currentVolume;
+    }
+  }, stepTime);
+}
+
+function playAudio(targetAudio) {
+  if (targetAudio.muted) return;
   
-  const targetVolume = parseFloat(bgAudio.dataset.targetVolume || "1.0");
-  bgAudio.volume = targetVolume;
-  bgAudio.play().catch(e => console.error("Audio play error:", e));
+  const targetVolume = parseFloat(bgAudio1.dataset.targetVolume || "1.0");
+  targetAudio.volume = targetVolume;
+  targetAudio.play().catch(e => console.error("Audio play error:", e));
 }
 
 async function triggerVideo(timeOfDay) {
@@ -136,26 +156,35 @@ async function ensureAudioPlaying(timeOfDay, s, m) {
     forceNew = true;
   }
   
-  if (forceNew || (bgAudio.paused && isIdle)) {
+  if (forceNew || (activeAudio.paused && isIdle)) {
     const auds = timeOfDay === 'day' ? mediaAssets.day_audio : mediaAssets.night_audio;
     if (!auds || auds.length === 0) return;
     const randomAudio = getRandomItem(auds);
     try {
       const resourcePath = await getLocalAssetPath(randomAudio);
-      bgAudio.src = convertFileSrc(resourcePath);
-      playAudio();
+      
+      if (forceNew && !activeAudio.paused) {
+        fadeOutAudio(activeAudio);
+        activeAudio = (activeAudio === bgAudio1) ? bgAudio2 : bgAudio1;
+      }
+      
+      activeAudio.src = convertFileSrc(resourcePath);
+      playAudio(activeAudio);
     } catch (error) {
       console.error("Failed to load audio resource:", error);
     }
   }
 }
 
-bgAudio.addEventListener('ended', () => {
+function onAudioEnded() {
   if (isIdle) {
     const now = new Date();
     ensureAudioPlaying(getTimeOfDay(now.getHours()), now.getSeconds(), now.getMinutes());
   }
-});
+}
+
+bgAudio1.addEventListener('ended', onAudioEnded);
+bgAudio2.addEventListener('ended', onAudioEnded);
 
 let currentState = { bg: '#FFFFFF', text: '#ED1D24' };
 let oldState = { bg: '#FFFFFF', text: '#ED1D24' };
@@ -256,12 +285,19 @@ updateClock();
 
 listen('volume-change', (event) => {
   const targetVolume = event.payload;
-  bgAudio.dataset.targetVolume = targetVolume;
+  bgAudio1.dataset.targetVolume = targetVolume;
+  bgAudio2.dataset.targetVolume = targetVolume;
+  
   if (targetVolume === 0) {
-    bgAudio.muted = true;
+    bgAudio1.muted = true;
+    bgAudio2.muted = true;
   } else {
-    bgAudio.muted = false;
-    bgAudio.volume = targetVolume;
+    bgAudio1.muted = false;
+    bgAudio2.muted = false;
+    
+    if (!activeAudio.paused) {
+      activeAudio.volume = targetVolume;
+    }
   }
 });
 
@@ -281,7 +317,8 @@ listen('idle-state-changed', (event) => {
     // Wake up! 
     widgetContainer.classList.add('hidden');
     hideVideo();
-    bgAudio.pause();
+    bgAudio1.pause();
+    bgAudio2.pause();
     lastTriggeredSecond = -1;
     lastAudioMinute = -1;
     hasStartedVideo = false;
