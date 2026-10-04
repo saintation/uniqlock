@@ -20,8 +20,30 @@ Right-click the UniQlock icon in your system tray to access the following settin
 - **Download Media Assets**: Triggers the background download of the required video and audio assets.
 - **Quit**: Completely exit the application.
 
+## How to Install & Use
+
+### Option 1: Download the Release (Recommended)
+1. Go to the [Releases](../../releases) page of this repository.
+2. Download the latest installer for your operating system.
+3. Install and run the application.
+4. Right-click the system tray icon and click **Download Media Assets** to fetch the necessary video and audio files (approx. 1.3GB).
+5. Enjoy the widget!
+
+### Option 2: Build from Source
+If you want to modify the code or build it yourself:
+1. Clone this repository: `git clone https://github.com/saintation/uniqlock.git`
+2. Ensure you have [Rust](https://rustup.rs/) and [Node.js](https://nodejs.org/) installed on your system.
+3. Navigate to the `app` directory: `cd uniqlock/app`
+4. Install dependencies: `npm install`
+5. Run the app in development mode: `npm run tauri dev`
+6. Build the app for release: `npm run tauri build`
+
 ## Acknowledgements 
 Special thanks and full credit to the [megajerk/uniqlock](https://github.com/megajerk/uniqlock) repository. This project was heavily inspired by their incredible work preserving the original UNIQLOCK assets and logic. Their repository provided the foundational understanding and media archive necessary to bring this legendary widget back to the modern desktop.
+
+## License
+The source code for this remake project is released under the **MIT License**. 
+However, all media assets (videos, music, and the UNIQLOCK concept) remain the property of UNIQLO and their respective copyright holders. This is a non-commercial tribute project and is not affiliated with or endorsed by UNIQLO.
 
 ---
 
@@ -47,5 +69,26 @@ Tauri와 최신 웹 기술로 다시 태어난 전설적인 바탕화면 위젯 
 - **Download Media Assets (미디어 다운로드)**: 위젯 실행에 필요한 고화질 영상/오디오 에셋을 백그라운드에서 다운로드합니다.
 - **Quit (종료)**: 애플리케이션을 완전히 종료합니다.
 
+## 설치 및 사용 방법
+
+### 방법 1: 릴리즈 버전 다운로드 (일반 사용자 권장)
+1. 이 저장소의 [Releases](../../releases) 페이지로 이동합니다.
+2. 사용 중인 운영체제에 맞는 최신 설치 파일을 다운로드하여 설치합니다.
+3. 앱을 실행한 후, 우측 하단 시스템 트레이 아이콘을 우클릭하고 **Download Media Assets**를 클릭하여 필요한 영상과 음악 파일(약 1.3GB)을 다운로드합니다.
+4. 다운로드가 완료되면 위젯을 자유롭게 사용하실 수 있습니다!
+
+### 방법 2: 소스 코드 직접 빌드하기
+코드를 수정하거나 직접 빌드하고 싶으신 경우 다음 절차를 따릅니다:
+1. 저장소 클론: `git clone https://github.com/saintation/uniqlock.git`
+2. PC에 [Rust](https://rustup.rs/)와 [Node.js](https://nodejs.org/)가 설치되어 있는지 확인합니다.
+3. `app` 디렉토리로 이동: `cd uniqlock/app`
+4. 패키지 설치: `npm install`
+5. 개발 모드로 실행: `npm run tauri dev`
+6. 릴리즈 빌드: `npm run tauri build`
+
 ## 감사의 글
 이 프로젝트는 [megajerk/uniqlock](https://github.com/megajerk/uniqlock) 저장소의 훌륭한 작업물에서 큰 영감을 받아 제작되었습니다. 오리지널 유니클락의 방대한 미디어 에셋을 보존하고 복원해주신 그들의 헌신적인 노력이 없었다면 이 프로젝트는 불가능했을 것입니다. 유니클락을 현대 데스크톱으로 다시 불러올 수 있게 큰 도움을 준 megajerk 님께 깊은 감사를 전합니다.
+
+## 라이선스
+이 리메이크 프로젝트가 작성한 **소스 코드**는 **MIT 라이선스**를 따릅니다.
+단, 앱 내에서 다운로드되어 재생되는 모든 미디어 에셋(영상, 오디오) 및 UNIQLOCK의 원본 콘셉트에 대한 저작권은 UNIQLO 및 원저작권자에게 있습니다. 본 프로젝트는 어떠한 상업적 목적도 없는 비영리 팬 메이드(Tribute) 프로젝트이며, UNIQLO와 공식적인 관련이 없습니다.
